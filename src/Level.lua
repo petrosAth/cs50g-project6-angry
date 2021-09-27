@@ -11,12 +11,16 @@ Level = Class{}
 function Level:init()
     
     -- create a new "world" (where physics take place), with no x gravity
-    -- and 30 units of Y gravity (for downward force)
+    -- and 300 units of Y gravity (for downward force)
     self.world = love.physics.newWorld(0, 300)
 
     -- bodies we will destroy after the world update cycle; destroying these in the
     -- actual collision callbacks can cause stack overflow and other errors
     self.destroyedBodies = {}
+
+    -- create 2 more player aliens above and below the initial one
+    self.threesCompany = false
+    self.twoFollowing = true
 
     -- define collision callbacks for our world; the World object expects four,
     -- one for different stages of any given collision
@@ -74,7 +78,7 @@ function Level:init()
         end
 
         -- if we hit the ground, play a bounce sound
-        if types['Player'] and types['Ground'] then
+        if (types['Player'] and types['Ground']) or (types['Player'] and types['Player']) then
             gSounds['bounce']:stop()
             gSounds['bounce']:play()
         end
@@ -104,6 +108,9 @@ function Level:init()
     -- aliens in our scene
     self.aliens = {}
 
+    -- player's extra aliens
+    self.companyAliens = {}
+
     -- obstacles guarding aliens that we can destroy
     self.obstacles = {}
 
@@ -112,6 +119,14 @@ function Level:init()
 
     -- spawn an alien to try and destroy
     table.insert(self.aliens, Alien(self.world, 'square', VIRTUAL_WIDTH - 80, VIRTUAL_HEIGHT - TILE_SIZE - ALIEN_SIZE / 2, 'Alien'))
+
+    for i = 1, 2 do
+        -- spawn an alien to try and destroy
+        table.insert(self.companyAliens, Alien(self.world, 'circle', self.launchMarker.baseX, self.launchMarker.baseY, 'Player'))
+
+        self.companyAliens[i].sprite = 8 - i
+        self.companyAliens[i].body:setActive(false)
+    end
 
     -- spawn a few obstacles
     table.insert(self.obstacles, Obstacle(self.world, 'vertical',
@@ -138,6 +153,37 @@ function Level:update(dt)
 
     -- Box2D world update code; resolves collisions and processes callbacks
     self.world:update(dt)
+
+    if self.launchMarker.launched then
+        -- keep track of initial player's alien position and linear velocity
+        local twoPosX, twoPosY = self.launchMarker.alien.body:getPosition()
+        local twoLinVX, twoLinVY = self.launchMarker.alien.body:getLinearVelocity()
+
+        -- if the original alien has been launched, activate the two extra player's aliens as soon as the user hits space
+        if self.threesCompany and self.twoFollowing then
+            gSounds['bounce']:stop()
+            gSounds['bounce']:play()
+
+            self.companyAliens[1].body:setPosition(twoPosX, twoPosY - 18)
+            self.companyAliens[2].body:setPosition(twoPosX, twoPosY + 18)
+
+            for i = 1, 2 do
+                self.companyAliens[i].body:setActive(true)
+                self.companyAliens[i].fixture:setRestitution(0.4)
+                self.companyAliens[i].body:setAngularDamping(1)
+            end
+
+            self.companyAliens[1].body:setLinearVelocity((twoLinVX + 30), (twoLinVY - 30))
+            self.companyAliens[2].body:setLinearVelocity((twoLinVX + 30), (twoLinVY + 30))
+
+            self.twoFollowing = false
+
+        elseif self.twoFollowing then
+            for i = 1, 2 do
+                self.companyAliens[i].body:setPosition(twoPosX, twoPosY)
+            end
+        end
+    end
 
     -- destroy all bodies we calculated to destroy during the update call
     for k, body in pairs(self.destroyedBodies) do
@@ -178,6 +224,7 @@ function Level:update(dt)
         -- if we fired our alien to the left or it's almost done rolling, respawn
         if xPos < 0 or (math.abs(xVel) + math.abs(yVel) < 1.5) then
             self.launchMarker.alien.body:destroy()
+            self.companyAliens = {}
             self.launchMarker = AlienLaunchMarker(self.world)
 
             -- re-initialize level if we have no more aliens
@@ -198,6 +245,10 @@ function Level:render()
     self.launchMarker:render()
 
     for k, alien in pairs(self.aliens) do
+        alien:render()
+    end
+
+    for k, alien in pairs(self.companyAliens) do
         alien:render()
     end
 

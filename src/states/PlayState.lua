@@ -41,16 +41,23 @@ function PlayState:update(dt)
         end
     end
 
+    if love.keyboard.wasPressed('space') then
+        if self.level.launchMarker.launched then
+            self.level.threesCompany = true
+        end
+    end
+
     self.level:update(dt)
 end
 
 function PlayState:render()
-    love.graphics.setColor(255, 255, 255, 255)
-    love.graphics.print('FPS: ' .. tostring(love.timer.getFPS()))
-    love.graphics.setColor(255, 255, 255, 255)
-
     -- render background separate from level rendering
     self.level.background:render()
+
+    -- love.graphics.setColor(0, 0, 0, 255/255)
+    -- love.graphics.setFont(gFonts['medium'])
+    -- love.graphics.print('FPS: ' .. tostring(love.timer.getFPS()))
+    -- love.graphics.setColor(255/255, 255/255, 255/255, 255/255)
 
     love.graphics.translate(math.floor(self.levelTranslateX), 0)
     self.level:render()
